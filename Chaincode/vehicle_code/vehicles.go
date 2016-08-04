@@ -20,22 +20,21 @@ import (
 //	 Participant types - Each participant type is mapped to an integer which we use to compare to the value stored in a
 //						 user's eCert
 //==============================================================================================================================
-const   AUTHORITY      =  1
-const   MANUFACTURER   =  2
-const   PRIVATE_ENTITY =  3
-const   LEASE_COMPANY  =  4
-const   SCRAP_MERCHANT =  5
+const   IBM      =  1
+const   DU_RHONE   =  2
+const   PRINTER =  3
+const   SUPPLIER  =  4
+const   SHIPPING_CO =  5
 
 
 //==============================================================================================================================
 //	 Status types - Asset lifecycle is broken down into 5 statuses, this is part of the business logic to determine what can 
 //					be done to the vehicle at points in it's lifecycle
 //==============================================================================================================================
-const   STATE_TEMPLATE  			=  0
-const   STATE_MANUFACTURE  			=  1
-const   STATE_PRIVATE_OWNERSHIP 	=  2
-const   STATE_LEASED_OUT 			=  3
-const   STATE_BEING_SCRAPPED  		=  4
+const   STATE_CONCEPTING  			=  0
+const   STATE_PRODUCTION			=  1
+const   STATE_DELIVERY			 	=  2
+const	STATE_DELIVERED				=  3
 
 //==============================================================================================================================
 //	 Structure Definitions 
@@ -47,30 +46,67 @@ type  SimpleChaincode struct {
 }
 
 //==============================================================================================================================
-//	Vehicle - Defines the structure for a car object. JSON on right tells it what JSON fields to map to
+//	Chocolates - Defines the structure for a chocolate object. JSON on right tells it what JSON fields to map to
 //			  that element when reading a JSON object into the struct e.g. JSON make -> Struct Make.
 //==============================================================================================================================
-type Vehicle struct {
-	Make            string `json:"make"`
-	Model           string `json:"model"`
-	Reg             string `json:"reg"`
-	VIN             int    `json:"VIN"`					
-	Owner           string `json:"owner"`
-	Scrapped        bool   `json:"scrapped"`
-	Status          int    `json:"status"`
-	Colour          string `json:"colour"`
-	V5cID           string `json:"v5cID"`
-	LeaseContractID string `json:"leaseContractID"`
+type Chocolates struct {
+	Recipe          string `json:"recipe"`
+	Manufacturer    string `json:"manufacturer"`
+	ChocoID         string `json:"ID"`
+	DateProduced	string `json:"dateProduced"`
+	DelivererID		string `json:"delivererID"`
+	DatePackaged	  string `json:"datePackaged"`
+	DateDelivered	  string `json:"dateDelivered"`
+	Receipt			  bool   `json:"receipt"`
+	Status			int	   `json:"status"`
 }
 
 
 //==============================================================================================================================
-//	V5C Holder - Defines the structure that holds all the v5cIDs for vehicles that have been created.
-//				Used as an index when querying all vehicles.
+//	Choco Holder - Defines the structure that holds all the IDs for chocolates that have been created.
+//				Used as an index when querying all chocolates.
 //==============================================================================================================================
 
-type V5C_Holder struct {
-	V5Cs 	[]string `json:"v5cs"`
+type Choco_Holder struct {
+	ChocoIDs 	[]string `json:"chocoIDs"`
+}
+
+
+//==============================================================================================================================
+//	Recipe - Defines the structure for a recipe
+//			    Contains all recipe info
+//==============================================================================================================================
+
+type Recipe struct {
+	Contributers 	[]string `json:"contributers"`
+	Ingredients		[]string `json:"ingredients"`
+	Method			  string `json:"method"`
+	DateFinalized	  string `json:"dateFinalized"`
+}
+
+//==============================================================================================================================
+//	Supplies - Defines the structure for supplies
+//			    Contains info for all supplies/ingredients
+//==============================================================================================================================
+
+type Supplies struct {
+	IngredOrderDate	  string `json:"ingredOrderDate"`
+	IngredDelvDate	  string `json:"ingredOrderDate"`
+	IngredOrigin	  string `json:"ingredOrigin"`
+	BoxOrderDate	  string `json:"boxOrderDate"`
+	BoxDelvDate		  string `json:"boxDelvDate"`
+}
+
+//==============================================================================================================================
+//	Test - Defines the structure for the Test
+//			    Contains info relating to tests/testers
+//==============================================================================================================================
+
+type Test struct {
+	TestID	          string `json:"testID"`
+	Testers      	[]string `json:"testers"`
+	Revisions		[]string `json:"revisions"`
+	TestDate		  string `json:"testDate"`
 }
 
 //==============================================================================================================================
@@ -91,13 +127,13 @@ func (t *SimpleChaincode) Init(stub *shim.ChaincodeStub, function string, args [
 	//			peer_address
 	
 	
-	var v5cIDs V5C_Holder
+	var chocoIDs Choco_Holder
 	
-	bytes, err := json.Marshal(v5cIDs)
+	bytes, err := json.Marshal(chocoIDs)
 	
-															if err != nil { return nil, errors.New("Error creating V5C_Holder record") }
+															if err != nil { return nil, errors.New("Error creating Choco_Holder record") }
 																
-	err = stub.PutState("v5cIDs", bytes)
+	err = stub.PutState("chocoIDs", bytes)
 	
 	
 	err = stub.PutState("Peer_Address", []byte(args[0]))
@@ -204,38 +240,40 @@ func (t *SimpleChaincode) get_caller_data(stub *shim.ChaincodeStub) (string, int
 }
 
 //==============================================================================================================================
-//	 retrieve_v5c - Gets the state of the data at v5cID in the ledger then converts it from the stored 
-//					JSON into the Vehicle struct for use in the contract. Returns the Vehcile struct.
+//	 retrieve_chocoID - Gets the state of the data at chocoID in the ledger then converts it from the stored 
+//					JSON into the Chocolates struct for use in the contract. Returns the chocolates struct.
 //					Returns empty v if it errors.
 //==============================================================================================================================
-func (t *SimpleChaincode) retrieve_v5c(stub *shim.ChaincodeStub, v5cID string) (Vehicle, error) {
+func (t *SimpleChaincode) retrieve_chocoID(stub *shim.ChaincodeStub, chocoID string) (Chocolates, error) {
 	
-	var v Vehicle
+	var c Chocolates
 
-	bytes, err := stub.GetState(v5cID)	;					
+	bytes, err := stub.GetState(chocoID)	;					
 				
-															if err != nil {	fmt.Printf("RETRIEVE_V5C: Failed to invoke vehicle_code: %s", err); return v, errors.New("RETRIEVE_V5C: Error retrieving vehicle with v5cID = " + v5cID) }
+															if err != nil {	fmt.Printf("RETRIEVE_CHOCOID: Failed to invoke chocolate_code: %s", err); return c, errors.New("RETRIEVE_CHOCOID: Error retrieving chocolates with chocoID = " + chocoID) }
 
-	err = json.Unmarshal(bytes, &v)	;						
+	err = json.Unmarshal(bytes, &c)	;						
 
-															if err != nil {	fmt.Printf("RETRIEVE_V5C: Corrupt vehicle record "+string(bytes)+": %s", err); return v, errors.New("RETRIEVE_V5C: Corrupt vehicle record"+string(bytes))	}
+															if err != nil {	fmt.Printf("RETRIEVE_CHOCOID: Corrupt chocolates record "+string(bytes)+": %s", err); return c, errors.New("RETRIEVE_CHOCOID: Corrupt chocolates record"+string(bytes))	}
 	
-	return v, nil
+	return c, nil
 }
 
+///////      8.3.2016   4:30 p.m.
+
 //==============================================================================================================================
-// save_changes - Writes to the ledger the Vehicle struct passed in a JSON format. Uses the shim file's 
+// save_changes - Writes to the ledger the Chocolates struct passed in a JSON format. Uses the shim file's 
 //				  method 'PutState'.
 //==============================================================================================================================
-func (t *SimpleChaincode) save_changes(stub *shim.ChaincodeStub, v Vehicle) (bool, error) {
+func (t *SimpleChaincode) save_changes(stub *shim.ChaincodeStub, c Chocolates) (bool, error) {
 	 
-	bytes, err := json.Marshal(v)
+	bytes, err := json.Marshal(c)
 	
-																if err != nil { fmt.Printf("SAVE_CHANGES: Error converting vehicle record: %s", err); return false, errors.New("Error converting vehicle record") }
+																if err != nil { fmt.Printf("SAVE_CHANGES: Error converting chocolates record: %s", err); return false, errors.New("Error converting chocolates record") }
 
-	err = stub.PutState(v.V5cID, bytes)
+	err = stub.PutState(c.chocoID, bytes)
 	
-																if err != nil { fmt.Printf("SAVE_CHANGES: Error storing vehicle record: %s", err); return false, errors.New("Error storing vehicle record") }
+																if err != nil { fmt.Printf("SAVE_CHANGES: Error storing chocolates record: %s", err); return false, errors.New("Error storing chocolates record") }
 	
 	return true, nil
 }
@@ -253,12 +291,12 @@ func (t *SimpleChaincode) Invoke(stub *shim.ChaincodeStub, function string, args
 	if err != nil { return nil, errors.New("Error retrieving caller information")}
 
 	
-	if function == "create_vehicle" { return t.create_vehicle(stub, caller, caller_affiliation, args[0])
-	} else { 																				// If the function is not a create then there must be a car so we need to retrieve the car.
+	if function == "create_chocolates" { return t.create_chocolates(stub, caller, caller_affiliation, args[0])
+	} else { 																				// If the function is not a create then there must be chocolates so we need to retrieve the chocolates.
 		
 		argPos := 1
 		
-		if function == "scrap_vehicle" {																// If its a scrap vehicle then only two arguments are passed (no update value) all others have three arguments and the v5cID is expected in the last argument
+		if function == "deliver_chocolates" {																// If its a scrap vehicle then only two arguments are passed (no update value) all others have three arguments and the v5cID is expected in the last argument
 			argPos = 0
 		}
 		
