@@ -20,22 +20,24 @@ import (
 //	 Participant types - Each participant type is mapped to an integer which we use to compare to the value stored in a
 //						 user's eCert
 //==============================================================================================================================
-const   IBM      =  1
-const   DU_RHONE   =  2
-const   PRINTER =  3
-const   SUPPLIER  =  4
-const   SHIPPING_CO =  5
+const   DU_RHONE   				=  1
+const   PRINTER 				=  2
+const   SUPPLIER  				=  3
+const   SHIPPING_CO 			=  4
+const   IBM      				=  5
 
 
 //==============================================================================================================================
-//	 Status types - Asset lifecycle is broken down into 5 statuses, this is part of the business logic to determine what can 
-//					be done to the vehicle at points in it's lifecycle
+//	 Status types - Asset lifecycle is broken down into 7 statuses, this is part of the business logic to determine what can 
+//					be done to the chocolates at points in it's lifecycle
 //==============================================================================================================================
 const   STATE_CONCEPTING  			=  0
-const	STATE_TESTING               =  1
-const   STATE_PRODUCTION			=  2
-const   STATE_DELIVERY			 	=  3
-const	STATE_DELIVERED				=  4
+const 	STATE_PRINTING				=  1
+const	STATE_SUPPLYING				=  2
+const	STATE_TESTING               =  3
+const   STATE_PRODUCTION			=  4
+const   STATE_DELIVERY			 	=  5
+const	STATE_DELIVERED				=  6
 
 //==============================================================================================================================
 //	 Structure Definitions 
@@ -66,18 +68,19 @@ type Chocolates struct {
 	Ingredients	  []string `json:"ingredients"`
 	Method			string `json:"method"`
 	//Taste Testing Info
-	TestID	        string `json:"testID"`
+	Test	        string `json:"test"`
 	Testers       []string `json:"testers"`
 	Revisions	  []string `json:"revisions"`
 	TestDate        string `json:"testDate"`
 	DateFinalized	string `json:"dateFinalized"`
 	//Production/Delivery Info
 	DateProduced	string `json:"dateProduced"`
-	DatePackaged	string `json:"datePackaged"`
-	DateDelivered   string `json:"dateDelivered"`
+	DatePackaged 	string `json:"datePackaged"`
+	DateArrived     string `json:"dateArrived"`
 	DelivererID		string `json:"delivererID"`
-	//Status infor
-	Receipt		    bool   `json:"receipt"`
+	//Status info
+	Owner			int    `json:"owner"`
+	Delivered		bool   `json:"delivered"`
 	Status			int	   `json:"status"`
 }
 
@@ -225,7 +228,7 @@ func (t *SimpleChaincode) get_caller_data(stub *shim.ChaincodeStub) (string, int
 //==============================================================================================================================
 //	 retrieve_chocoID - Gets the state of the data at chocoID in the ledger then converts it from the stored 
 //					JSON into the Chocolates struct for use in the contract. Returns the chocolates struct.
-//					Returns empty v if it errors.
+//					Returns empty c if it errors.
 //==============================================================================================================================
 func (t *SimpleChaincode) retrieve_chocoID(stub *shim.ChaincodeStub, chocoID string) (Chocolates, error) {
 	
@@ -279,16 +282,16 @@ func (t *SimpleChaincode) Invoke(stub *shim.ChaincodeStub, function string, args
 		
 		argPos := 1
 		
-		if function == "deliver_chocolates" {																// If its a scrap vehicle then only two arguments are passed (no update value) all others have three arguments and the v5cID is expected in the last argument
+		if function == "finish_delivery" {																// If its a delivery then only two arguments are passed (no update value) all others have three arguments and the chocoID is expected in the last argument
 			argPos = 0
 		}
 		
-		v, err := t.retrieve_v5c(stub, args[argPos])
+		v, err := t.retrieve_chocoID(stub, args[argPos])
 		
-																							if err != nil { fmt.Printf("INVOKE: Error retrieving v5c: %s", err); return nil, errors.New("Error retrieving v5c") }
+																							if err != nil { fmt.Printf("INVOKE: Error retrieving chocoID: %s", err); return nil, errors.New("Error retrieving chocoID") }
 																		
 		if strings.Contains(function, "update") == false           && 
-		   function 							!= "scrap_vehicle"    { 									// If the function is not an update or a scrappage it must be a transfer so we need to get the ecert of the recipient.
+		   function 							!= "finish_delivery"    { 									// If the function is not an update or a delivery it must be a transfer so we need to get the ecert of the recipient.
 			
 				ecert, err := t.get_ecert(stub, args[0]);					
 				
@@ -298,20 +301,30 @@ func (t *SimpleChaincode) Invoke(stub *shim.ChaincodeStub, function string, args
 				
 																		if err != nil { return nil, err }
 				
-				if 		   function == "authority_to_manufacturer" { return t.authority_to_manufacturer(stub, v, caller, caller_affiliation, args[0], rec_affiliation)
-				} else if  function == "manufacturer_to_private"   { return t.manufacturer_to_private(stub, v, caller, caller_affiliation, args[0], rec_affiliation)
-				} else if  function == "private_to_private" 	   { return t.private_to_private(stub, v, caller, caller_affiliation, args[0], rec_affiliation)
-				} else if  function == "private_to_lease_company"  { return t.private_to_lease_company(stub, v, caller, caller_affiliation, args[0], rec_affiliation)
-				} else if  function == "lease_company_to_private"  { return t.lease_company_to_private(stub, v, caller, caller_affiliation, args[0], rec_affiliation)
-				} else if  function == "private_to_scrap_merchant" { return t.private_to_scrap_merchant(stub, v, caller, caller_affiliation, args[0], rec_affiliation)
+				if 		   function == "concepting_to_printing"    { return t.concepting_to_printing(stub, c, caller, caller_affiliation, args[0], rec_affiliation)
+				} else if  function == "printing_to_supplying"      { return t.printing_to_supplying(stub, c, caller, caller_affiliation, args[0], rec_affiliation)
+				} else if  function == "supplying_to_testing"       { return t.supplying_to_testing(stub, c, caller, caller_affiliation, args[0], rec_affiliation)
+				} else if  function == "testing_to_produciton"     { return t.testing_to_produciton(stub, c, caller, caller_affiliation, args[0], rec_affiliation)
+				} else if  function == "production_to_delivery"    { return t.production_to_delivery(stub, c, caller, caller_affiliation, args[0], rec_affiliation)
+				} else if  function == "delivery_to_delivered"     { return t.delivery_to_delivered(stub, c, caller, caller_affiliation, args[0], rec_affiliation)
 				}
-			
-		} else if function == "update_make"  	    { return t.update_make(stub, v, caller, caller_affiliation, args[0])
-		} else if function == "update_model"        { return t.update_model(stub, v, caller, caller_affiliation, args[0])
-		} else if function == "update_registration" { return t.update_registration(stub, v, caller, caller_affiliation, args[0])
-		} else if function == "update_vin" 			{ return t.update_vin(stub, v, caller, caller_affiliation, args[0])
-		} else if function == "update_colour" 		{ return t.update_colour(stub, v, caller, caller_affiliation, args[0])
-		} else if function == "scrap_vehicle" 		{ return t.scrap_vehicle(stub, v, caller, caller_affiliation) }
+
+
+		} else if function == "update_boxOrderDate"  	    	{ return t.update_boxOrderDate(stub, c, caller, caller_affiliation, args[0])
+		} else if function == "update_boxDelvDate"       		{ return t.update_boxDelvDate(stub, c, caller, caller_affiliation, args[0])
+		} else if function == "update_ingredOrderDate" 			{ return t.update_ingredOrderDate(stub, c, caller, caller_affiliation, args[0])
+		} else if function == "update_ingredDelvDate" 			{ return t.update_ingredDelvDate(stub, c, caller, caller_affiliation, args[0])
+		} else if function == "update_ingredOrigin" 			{ return t.update_ingredOrigin(stub, c, caller, caller_affiliation, args[0])
+		} else if function == "update_contributers" 			{ return t.update_contributers(stub, c, caller, caller_affiliation, args[0])
+		} else if function == "update_ingredients" 				{ return t.update_ingredients(stub, c, caller, caller_affiliation, args[0])
+		} else if function == "update_test" 					{ return t.update_test(stub, c, caller, caller_affiliation, args[0])
+		} else if function == "update_testers"  	 			{ return t.update_testers(stub, c, caller, caller_affiliation, args[0])
+		} else if function == "update_revisions" 				{ return t.update_revisions(stub, c, caller, caller_affiliation, args[0])
+		} else if function == "update_dateFinalized" 			{ return t.update_dateFinalized(stub, c, caller, caller_affiliation, args[0])
+		} else if function == "update_delivererID" 				{ return t.update_delivererID(stub, c, caller, caller_affiliation, args[0])
+		} else if function == "update_receipt" 					{ return t.update_receipt(stub, c, caller, caller_affiliation, args[0])
+		} else if function == "finish_delivery" 			    { return t.finish_delivery(stub, c, caller, caller_affiliation) }
+		}
 		
 																						return nil, errors.New("Function of that name doesn't exist.")
 			
@@ -328,18 +341,18 @@ func (t *SimpleChaincode) Query(stub *shim.ChaincodeStub, function string, args 
 
 																							if err != nil { fmt.Printf("QUERY: Error retrieving caller details", err); return nil, errors.New("QUERY: Error retrieving caller details") }
 															
-	if function == "get_vehicle_details" { 
+	if function == "get_chocolate_details" { 
 	
 			if len(args) != 1 { fmt.Printf("Incorrect number of arguments passed"); return nil, errors.New("QUERY: Incorrect number of arguments passed") }
 	
 	
-			v, err := t.retrieve_v5c(stub, args[0])
-																							if err != nil { fmt.Printf("QUERY: Error retrieving v5c: %s", err); return nil, errors.New("QUERY: Error retrieving v5c "+err.Error()) }
+			v, err := t.retrieve_chocoID(stub, args[0])
+																							if err != nil { fmt.Printf("QUERY: Error retrieving chocoID: %s", err); return nil, errors.New("QUERY: Error retrieving chocoID "+err.Error()) }
 	
-			return t.get_vehicle_details(stub, v, caller, caller_affiliation)
+			return t.get_chocolate_details(stub, c, caller, caller_affiliation)
 			
-	} else if function == "get_vehicles" {
-			return t.get_vehicles(stub, caller, caller_affiliation)
+	} else if function == "get_chocos" {
+			return t.get_chocos(stub, caller, caller_affiliation)
 	}
 																							return nil, errors.New("Received unknown function invocation")
 }
@@ -347,70 +360,93 @@ func (t *SimpleChaincode) Query(stub *shim.ChaincodeStub, function string, args 
 //=================================================================================================================================
 //	 Create Function
 //=================================================================================================================================									
-//	 Create Vehicle - Creates the initial JSON for the vehcile and then saves it to the ledger.									
+//	 Create Chocolates - Creates the initial JSON for the chocolates and then saves it to the ledger.									
 //=================================================================================================================================
-func (t *SimpleChaincode) create_vehicle(stub *shim.ChaincodeStub, caller string, caller_affiliation int, v5cID string) ([]byte, error) {								
+func (t *SimpleChaincode) create_chocolates(stub *shim.ChaincodeStub, caller string, caller_affiliation int, chocoID string) ([]byte, error) {								
 
-	var v Vehicle																																										
+
+	var c Chocolates																																										
 	
-	v5c_ID         := "\"v5cID\":\""+v5cID+"\", "							// Variables to define the JSON
-	vin            := "\"VIN\":0, "
-	make           := "\"Make\":\"UNDEFINED\", "
-	model          := "\"Model\":\"UNDEFINED\", "
-	reg            := "\"Reg\":\"UNDEFINED\", "
-	owner          := "\"Owner\":\""+caller+"\", "
-	colour         := "\"Colour\":\"UNDEFINED\", "
-	leaseContract  := "\"LeaseContractID\":\"UNDEFINED\", "
-	status         := "\"Status\":0, "
-	scrapped       := "\"Scrapped\":false"
+			// Variables to define the JSON
+		//Company Info and ID
+	chocolatier    	:= "\"Chocolatier\":\"Du Rhone-IBM\", "
+	establishDate	:= "\"Chocolatier\":\"UNDEFINED\", "
+	chocoID         := "\"Chocolatier\":\""+chocoID+"\", "
+	//Supply Info
+	boxOrderDate	:= "\"Chocolatier\":\"UNDEFINED\", "
+	boxDelvDate		:= "\"Chocolatier\":\"UNDEFINED\", "
+	ingredOrderDate	:= "\"Chocolatier\":\"UNDEFINED\", "
+	ingredDelvDate	:= "\"Chocolatier\":\"UNDEFINED\", "
+	ingredOrigin	:= "\"Chocolatier\":\"UNDEFINED\", "
+	// Recipe Info
+	contributers    := "\"Chocolatier\":{} "
+	ingredients	    := "\"Chocolatier\":{} "
+	method			:= "\"Chocolatier\":\"Chef Watson + Chocolatier\", "
+	//Taste Testing Info
+	test	        := "\"Chocolatier\":\"UNDEFINED\", "
+	testers         := "\"Chocolatier\":{} "
+	revisions	    := "\"Chocolatier\":{} "
+	testDate        := "\"Chocolatier\":\"UNDEFINED\", "
+	dateFinalized	:= "\"Chocolatier\":\"UNDEFINED\", "
+	//Production/Delivery Info
+	dateProduced	:= "\"Chocolatier\":\"UNDEFINED\", "
+	datePackaged 	:= "\"Chocolatier\":\"UNDEFINED\", "
+	dateArrived     := "\"Chocolatier\":\"UNDEFINED\", "
+	delivererID		:= "\"Chocolatier\":\"UNDEFINED\", "
+	//Status info
+	owner			:= "\"Chocolatier\":2, "
+	delivered		:= "\"Chocolatier\":false"
+	status			:= "\"Chocolatier\":0, "
+
 	
-	vehicle_json := "{"+v5c_ID+vin+make+model+reg+owner+colour+leaseContract+status+scrapped+"}" 	// Concatenates the variables to create the total JSON object
+	chocolates_json := "{"+chocolatier+establishDate+chocoID+boxOrderDate+boxDelvDate+ingredOrderDate+ingredDelvDate+ingredOrigin
+	+contributers+ingredients+method+test+testers+revisions+testDate+dateFinalized+dateProduced+datePackaged+dateArrived+delivererID+delivered+status+"}" 	// Concatenates the variables to create the total JSON object
 	
-	matched, err := regexp.Match("^[A-z][A-z][0-9]{7}", []byte(v5cID))  				// matched = true if the v5cID passed fits format of two letters followed by seven digits
+	matched, err := regexp.Match("^[A-z][A-z][0-9]{7}", []byte(chocoID))  				// matched = true if the chocoID passed fits format of two letters followed by seven digits
 	
-																		if err != nil { fmt.Printf("CREATE_VEHICLE: Invalid v5cID: %s", err); return nil, errors.New("Invalid v5cID") }
+																		if err != nil { fmt.Printf("CREATE_CHOCOLATES: Invalid chocoID: %s", err); return nil, errors.New("Invalid chocoID") }
 	
-	if 				v5c_ID  == "" 	 || 
+	if 				chocoID  == "" 	 || 
 					matched == false    {
-																		fmt.Printf("CREATE_VEHICLE: Invalid v5cID provided");
-																		return nil, errors.New("Invalid v5cID provided")
+																		fmt.Printf("CREATE_CHOCOLATES: Invalid chocoID provided");
+																		return nil, errors.New("Invalid chocoID provided")
 	}
 
-	err = json.Unmarshal([]byte(vehicle_json), &v)							// Convert the JSON defined above into a vehicle object for go
+	err = json.Unmarshal([]byte(chocolates_json), &c)							// Convert the JSON defined above into a chocolates object for go
 	
 																		if err != nil { return nil, errors.New("Invalid JSON object") }
 
-	record, err := stub.GetState(v.V5cID) 								// If not an error then a record exists so cant create a new car with this V5cID as it must be unique
+	record, err := stub.GetState(c.chocoID) 								// If not an error then a record exists so cant create a new chocolates with this chocoID as it must be unique
 	
-																		if record != nil { return nil, errors.New("Vehicle already exists") }
+																		if record != nil { return nil, errors.New("Chocolates already exists") }
 	
-	if 	caller_affiliation != AUTHORITY {							// Only the regulator can create a new v5c
+	if 	caller_affiliation != DU_RHONE {							// Only DU_RHONE can create a new chocoID
 
 																		return nil, errors.New("Permission Denied")
 	}
 	
-	_, err  = t.save_changes(stub, v)									
+	_, err  = t.save_changes(stub, c)									
 			
-																		if err != nil { fmt.Printf("CREATE_VEHICLE: Error saving changes: %s", err); return nil, errors.New("Error saving changes") }
+																		if err != nil { fmt.Printf("CREATE_CHOCOLATES: Error saving changes: %s", err); return nil, errors.New("Error saving changes") }
 	
-	bytes, err := stub.GetState("v5cIDs")
+	bytes, err := stub.GetState("chocoIDs")
 
-																		if err != nil { return nil, errors.New("Unable to get v5cIDs") }
+																		if err != nil { return nil, errors.New("Unable to get chocoIDs") }
 																		
-	var v5cIDs V5C_Holder
+	var chocoIDs Choco_Holder
 	
-	err = json.Unmarshal(bytes, &v5cIDs)
+	err = json.Unmarshal(bytes, &chocoIDs)
 	
-																		if err != nil {	return nil, errors.New("Corrupt V5C_Holder record") }
+																		if err != nil {	return nil, errors.New("Corrupt Choco_Holder record") }
 															
-	v5cIDs.V5Cs = append(v5cIDs.V5Cs, v5cID)
+	chocoIDs.Chocos = append(chocoIDs.Chocos, chocoID)
 	
 	
-	bytes, err = json.Marshal(v5cIDs)
+	bytes, err = json.Marshal(chocoIDs)
 	
-															if err != nil { fmt.Print("Error creating V5C_Holder record") }
+															if err != nil { fmt.Print("Error creating Choco_Holder record") }
 
-	err = stub.PutState("v5cIDs", bytes)
+	err = stub.PutState("chocoIDs", bytes)
 
 															if err != nil { return nil, errors.New("Unable to put the state") }
 	
@@ -421,73 +457,76 @@ func (t *SimpleChaincode) create_vehicle(stub *shim.ChaincodeStub, caller string
 //=================================================================================================================================
 //	 Transfer Functions
 //=================================================================================================================================
-//	 authority_to_manufacturer
+//	 concepting_to_printing
 //=================================================================================================================================
-func (t *SimpleChaincode) authority_to_manufacturer(stub *shim.ChaincodeStub, v Vehicle, caller string, caller_affiliation int, recipient_name string, recipient_affiliation int) ([]byte, error) {
+func (t *SimpleChaincode) concepting_to_printing(stub *shim.ChaincodeStub, c Chocolates, caller string, caller_affiliation int, recipient_name string, recipient_affiliation int) ([]byte, error) {
 	
-	if     	v.Status				== STATE_TEMPLATE	&&
-			v.Owner					== caller			&&
-			caller_affiliation		== AUTHORITY		&&
-			recipient_affiliation	== MANUFACTURER		&&
-			v.Scrapped				== false			{		// If the roles and users are ok 
+	if     	c.Status				== STATE_CONCEPTING	&&
+			c.Owner					== caller			&&
+			caller_affiliation		== DU_RHONE			&&
+			recipient_affiliation	== PRINTER			&&
+			c.Delivered				== false			{		// If the roles and users are ok 
 	
-					v.Owner  = recipient_name		// then make the owner the new owner
-					v.Status = STATE_MANUFACTURE			// and mark it in the state of manufacture
-	
+					c.Owner  = recipient_name			// then make the owner the new owner
+					c.Status = STATE_PRINTING			//Update State
+					
 	} else {									// Otherwise if there is an error
 	
-															fmt.Printf("AUTHORITY_TO_MANUFACTURER: Permission Denied");
+															fmt.Printf("CONCEPTING_TO_PRINTING: Permission Denied");
 															return nil, errors.New("Permission Denied")
 	
 	}
 	
-	_, err := t.save_changes(stub, v)						// Write new state
+	_, err := t.save_changes(stub, c)						// Write new state
 
-															if err != nil {	fmt.Printf("AUTHORITY_TO_MANUFACTURER: Error saving changes: %s", err); return nil, errors.New("Error saving changes")	}
+															if err != nil {	fmt.Printf("CONCEPTING_TO_PRINTING: Error saving changes: %s", err); return nil, errors.New("Error saving changes")	}
 														
 	return nil, nil									// We are Done
 	
 }
 
 //=================================================================================================================================
-//	 manufacturer_to_private
+//	 printing_to_supplying
 //=================================================================================================================================
-func (t *SimpleChaincode) manufacturer_to_private(stub *shim.ChaincodeStub, v Vehicle, caller string, caller_affiliation int, recipient_name string, recipient_affiliation int) ([]byte, error) {
+func (t *SimpleChaincode) printing_to_supplying(stub *shim.ChaincodeStub, c Chocolates, caller string, caller_affiliation int, recipient_name string, recipient_affiliation int) ([]byte, error) {
 	
-	if 		v.Make 	 == "UNDEFINED" || 					
-			v.Model  == "UNDEFINED" || 
-			v.Reg 	 == "UNDEFINED" || 
-			v.Colour == "UNDEFINED" || 
-			v.VIN == 0				{					//If any part of the car is undefined it has not bene fully manufacturered so cannot be sent
-															fmt.Printf("MANUFACTURER_TO_PRIVATE: Car not fully defined")
-															return nil, errors.New("Car not fully defined")
+	if 		c.EstablishDate == "UNDEFINED" || 					
+			c.Ingredients   == {} 		   ||
+			c.Contributers  == {}		   ||
+			c.Method        == "UNDEFINED" || 
+			c.DateFinalized == "UNDEFINED"	{
+														//If any part of the chocolates is undefined it has not bene fully concepted so cannot be sent
+															fmt.Printf("PRINTING_TO_SUPPLYING: Chocolates not fully defined")
+															return nil, errors.New("Chocolates not fully defined")
 	}
 	
-	if 		v.Status				== STATE_MANUFACTURE	&& 
-			v.Owner					== caller				&& 
-			caller_affiliation		== MANUFACTURER			&&
-			recipient_affiliation	== PRIVATE_ENTITY		&& 
-			v.Scrapped     == false							{
+	if 		c.Status				== STATE_PRINTING		&& 
+			c.Owner					== caller				&& 
+			caller_affiliation		== PRINTER				&&
+			recipient_affiliation	== SUPPLIER				&& 
+			C.Delivered             == false							{
 			
 					v.Owner = recipient_name
-					v.Status = STATE_PRIVATE_OWNERSHIP
+					v.Status = STATE_SUPPLYING
 					
 	} else {
 															return nil, errors.New("Permission denied")
 	}
 	
-	_, err := t.save_changes(stub, v)
+	_, err := t.save_changes(stub, c)
 	
-															if err != nil { fmt.Printf("MANUFACTURER_TO_PRIVATE: Error saving changes: %s", err); return nil, errors.New("Error saving changes") }
+															if err != nil { fmt.Printf("PRINTING_TO_SUPPLYING: Error saving changes: %s", err); return nil, errors.New("Error saving changes") }
 	
 	return nil, nil
 	
 }
 
+//////////// 8.4.2016      4:47 p.m.
+
 //=================================================================================================================================
 //	 private_to_private
 //=================================================================================================================================
-func (t *SimpleChaincode) private_to_private(stub *shim.ChaincodeStub, v Vehicle, caller string, caller_affiliation int, recipient_name string, recipient_affiliation int) ([]byte, error) {
+func (t *SimpleChaincode) private_to_private(stub *shim.ChaincodeStub, c Vehicle, caller string, caller_affiliation int, recipient_name string, recipient_affiliation int) ([]byte, error) {
 	
 	if 		v.Status				== STATE_PRIVATE_OWNERSHIP	&&
 			v.Owner					== caller					&&
@@ -514,7 +553,7 @@ func (t *SimpleChaincode) private_to_private(stub *shim.ChaincodeStub, v Vehicle
 //=================================================================================================================================
 //	 private_to_lease_company
 //=================================================================================================================================
-func (t *SimpleChaincode) private_to_lease_company(stub *shim.ChaincodeStub, v Vehicle, caller string, caller_affiliation int, recipient_name string, recipient_affiliation int) ([]byte, error) {
+func (t *SimpleChaincode) private_to_lease_company(stub *shim.ChaincodeStub, c Vehicle, caller string, caller_affiliation int, recipient_name string, recipient_affiliation int) ([]byte, error) {
 	
 	if 		v.Status				== STATE_PRIVATE_OWNERSHIP	&& 
 			v.Owner					== caller					&& 
@@ -538,7 +577,7 @@ func (t *SimpleChaincode) private_to_lease_company(stub *shim.ChaincodeStub, v V
 //=================================================================================================================================
 //	 lease_company_to_private
 //=================================================================================================================================
-func (t *SimpleChaincode) lease_company_to_private(stub *shim.ChaincodeStub, v Vehicle, caller string, caller_affiliation int, recipient_name string, recipient_affiliation int) ([]byte, error) {
+func (t *SimpleChaincode) lease_company_to_private(stub *shim.ChaincodeStub, c Vehicle, caller string, caller_affiliation int, recipient_name string, recipient_affiliation int) ([]byte, error) {
 	
 	if		v.Status				== STATE_PRIVATE_OWNERSHIP	&&
 			v.Owner  				== caller					&& 
@@ -562,7 +601,7 @@ func (t *SimpleChaincode) lease_company_to_private(stub *shim.ChaincodeStub, v V
 //=================================================================================================================================
 //	 private_to_scrap_merchant
 //=================================================================================================================================
-func (t *SimpleChaincode) private_to_scrap_merchant(stub *shim.ChaincodeStub, v Vehicle, caller string, caller_affiliation int, recipient_name string, recipient_affiliation int) ([]byte, error) {
+func (t *SimpleChaincode) private_to_scrap_merchant(stub *shim.ChaincodeStub, c Vehicle, caller string, caller_affiliation int, recipient_name string, recipient_affiliation int) ([]byte, error) {
 	
 	if		v.Status				== STATE_PRIVATE_OWNERSHIP	&&
 			v.Owner					== caller					&& 
@@ -592,7 +631,7 @@ func (t *SimpleChaincode) private_to_scrap_merchant(stub *shim.ChaincodeStub, v 
 //=================================================================================================================================
 //	 update_vin
 //=================================================================================================================================
-func (t *SimpleChaincode) update_vin(stub *shim.ChaincodeStub, v Vehicle, caller string, caller_affiliation int, new_value string) ([]byte, error) {
+func (t *SimpleChaincode) update_vin(stub *shim.ChaincodeStub, c Vehicle, caller string, caller_affiliation int, new_value string) ([]byte, error) {
 	
 	new_vin, err := strconv.Atoi(string(new_value)) 		                // will return an error if the new vin contains non numerical chars
 	
@@ -623,7 +662,7 @@ func (t *SimpleChaincode) update_vin(stub *shim.ChaincodeStub, v Vehicle, caller
 //=================================================================================================================================
 //	 update_registration
 //=================================================================================================================================
-func (t *SimpleChaincode) update_registration(stub *shim.ChaincodeStub, v Vehicle, caller string, caller_affiliation int, new_value string) ([]byte, error) {
+func (t *SimpleChaincode) update_registration(stub *shim.ChaincodeStub, c Vehicle, caller string, caller_affiliation int, new_value string) ([]byte, error) {
 
 	
 	if		v.Owner				== caller			&& 
@@ -647,7 +686,7 @@ func (t *SimpleChaincode) update_registration(stub *shim.ChaincodeStub, v Vehicl
 //=================================================================================================================================
 //	 update_colour
 //=================================================================================================================================
-func (t *SimpleChaincode) update_colour(stub *shim.ChaincodeStub, v Vehicle, caller string, caller_affiliation int, new_value string) ([]byte, error) {
+func (t *SimpleChaincode) update_colour(stub *shim.ChaincodeStub, c Vehicle, caller string, caller_affiliation int, new_value string) ([]byte, error) {
 	
 	if 		v.Owner				== caller				&&
 			caller_affiliation	== MANUFACTURER			&&/*((v.Owner				== caller			&&
@@ -672,7 +711,7 @@ func (t *SimpleChaincode) update_colour(stub *shim.ChaincodeStub, v Vehicle, cal
 //=================================================================================================================================
 //	 update_make
 //=================================================================================================================================
-func (t *SimpleChaincode) update_make(stub *shim.ChaincodeStub, v Vehicle, caller string, caller_affiliation int, new_value string) ([]byte, error) {
+func (t *SimpleChaincode) update_make(stub *shim.ChaincodeStub, c Vehicle, caller string, caller_affiliation int, new_value string) ([]byte, error) {
 	
 	if 		v.Status			== STATE_MANUFACTURE	&&
 			v.Owner				== caller				&& 
@@ -697,7 +736,7 @@ func (t *SimpleChaincode) update_make(stub *shim.ChaincodeStub, v Vehicle, calle
 //=================================================================================================================================
 //	 update_model
 //=================================================================================================================================
-func (t *SimpleChaincode) update_model(stub *shim.ChaincodeStub, v Vehicle, caller string, caller_affiliation int, new_value string) ([]byte, error) {
+func (t *SimpleChaincode) update_model(stub *shim.ChaincodeStub, c Vehicle, caller string, caller_affiliation int, new_value string) ([]byte, error) {
 	
 	if 		v.Status			== STATE_MANUFACTURE	&&
 			v.Owner				== caller				&& 
@@ -721,7 +760,7 @@ func (t *SimpleChaincode) update_model(stub *shim.ChaincodeStub, v Vehicle, call
 //=================================================================================================================================
 //	 scrap_vehicle
 //=================================================================================================================================
-func (t *SimpleChaincode) scrap_vehicle(stub *shim.ChaincodeStub, v Vehicle, caller string, caller_affiliation int) ([]byte, error) {
+func (t *SimpleChaincode) scrap_vehicle(stub *shim.ChaincodeStub, c Vehicle, caller string, caller_affiliation int) ([]byte, error) {
 
 	if		v.Status			== STATE_BEING_SCRAPPED	&& 
 			v.Owner				== caller				&& 
@@ -747,7 +786,7 @@ func (t *SimpleChaincode) scrap_vehicle(stub *shim.ChaincodeStub, v Vehicle, cal
 //=================================================================================================================================
 //	 get_vehicle_details
 //=================================================================================================================================
-func (t *SimpleChaincode) get_vehicle_details(stub *shim.ChaincodeStub, v Vehicle, caller string, caller_affiliation int) ([]byte, error) {
+func (t *SimpleChaincode) get_vehicle_details(stub *shim.ChaincodeStub, c Vehicle, caller string, caller_affiliation int) ([]byte, error) {
 	
 	bytes, err := json.Marshal(v)
 	
@@ -782,7 +821,7 @@ func (t *SimpleChaincode) get_vehicles(stub *shim.ChaincodeStub, caller string, 
 	result := "["
 	
 	var temp []byte
-	var v Vehicle
+	var c Vehicle
 	
 	for _, v5c := range v5cIDs.V5Cs {
 		
@@ -790,7 +829,7 @@ func (t *SimpleChaincode) get_vehicles(stub *shim.ChaincodeStub, caller string, 
 		
 		if err != nil {return nil, errors.New("Failed to retrieve V5C")}
 		
-		temp, err = t.get_vehicle_details(stub, v, caller, caller_affiliation)
+		temp, err = t.get_vehicle_details(stub, c, caller, caller_affiliation)
 		
 		if err == nil {
 			result += string(temp) + ","	
