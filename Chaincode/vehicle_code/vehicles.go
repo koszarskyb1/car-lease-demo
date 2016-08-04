@@ -32,9 +32,10 @@ const   SHIPPING_CO =  5
 //					be done to the vehicle at points in it's lifecycle
 //==============================================================================================================================
 const   STATE_CONCEPTING  			=  0
-const   STATE_PRODUCTION			=  1
-const   STATE_DELIVERY			 	=  2
-const	STATE_DELIVERED				=  3
+const	STATE_TESTING               =  1
+const   STATE_PRODUCTION			=  2
+const   STATE_DELIVERY			 	=  3
+const	STATE_DELIVERED				=  4
 
 //==============================================================================================================================
 //	 Structure Definitions 
@@ -50,14 +51,33 @@ type  SimpleChaincode struct {
 //			  that element when reading a JSON object into the struct e.g. JSON make -> Struct Make.
 //==============================================================================================================================
 type Chocolates struct {
-	Recipe          string `json:"recipe"`
-	Manufacturer    string `json:"manufacturer"`
+	//Company Infor and ID
+	Chocolatier    	string `json:"chocolatier"`
+	EstablishDate	string `json:"establishDate"`
 	ChocoID         string `json:"ID"`
+	//Supply Info
+	BoxOrderDate	string `json:"boxOrderDate"`
+	BoxDelvDate		string `json:"boxDelvDate"`
+	IngredOrderDate	string `json:"ingredOrderDate"`
+	IngredDelvDate	string `json:"ingredOrderDate"`
+	IngredOrigin	string `json:"ingredOrigin"` 
+	// Recipe Info
+	Contributers  []string `json:"contributers"`
+	Ingredients	  []string `json:"ingredients"`
+	Method			string `json:"method"`
+	//Taste Testing Info
+	TestID	        string `json:"testID"`
+	Testers       []string `json:"testers"`
+	Revisions	  []string `json:"revisions"`
+	TestDate        string `json:"testDate"`
+	DateFinalized	string `json:"dateFinalized"`
+	//Production/Delivery Info
 	DateProduced	string `json:"dateProduced"`
+	DatePackaged	string `json:"datePackaged"`
+	DateDelivered   string `json:"dateDelivered"`
 	DelivererID		string `json:"delivererID"`
-	DatePackaged	  string `json:"datePackaged"`
-	DateDelivered	  string `json:"dateDelivered"`
-	Receipt			  bool   `json:"receipt"`
+	//Status infor
+	Receipt		    bool   `json:"receipt"`
 	Status			int	   `json:"status"`
 }
 
@@ -71,44 +91,6 @@ type Choco_Holder struct {
 	ChocoIDs 	[]string `json:"chocoIDs"`
 }
 
-
-//==============================================================================================================================
-//	Recipe - Defines the structure for a recipe
-//			    Contains all recipe info
-//==============================================================================================================================
-
-type Recipe struct {
-	Contributers 	[]string `json:"contributers"`
-	Ingredients		[]string `json:"ingredients"`
-	Method			  string `json:"method"`
-	DateFinalized	  string `json:"dateFinalized"`
-}
-
-//==============================================================================================================================
-//	Supplies - Defines the structure for supplies
-//			    Contains info for all supplies/ingredients
-//==============================================================================================================================
-
-type Supplies struct {
-	IngredOrderDate	  string `json:"ingredOrderDate"`
-	IngredDelvDate	  string `json:"ingredOrderDate"`
-	IngredOrigin	  string `json:"ingredOrigin"`
-	BoxOrderDate	  string `json:"boxOrderDate"`
-	BoxDelvDate		  string `json:"boxDelvDate"`
-}
-
-//==============================================================================================================================
-//	Test - Defines the structure for the Test
-//			    Contains info relating to tests/testers
-//==============================================================================================================================
-
-type Test struct {
-	TestID	          string `json:"testID"`
-	Testers      	[]string `json:"testers"`
-	Revisions		[]string `json:"revisions"`
-	TestDate		  string `json:"testDate"`
-}
-
 //==============================================================================================================================
 //	ECertResponse - Struct for storing the JSON response of retrieving an ECert. JSON OK -> Struct OK
 //==============================================================================================================================
@@ -116,6 +98,7 @@ type ECertResponse struct {
 	OK string `json:"OK"`
 	Error string `json:"Error"`
 }					
+
 
 //==============================================================================================================================
 //	Init Function - Called when the user deploys the chaincode																	
