@@ -524,93 +524,95 @@ func (t *SimpleChaincode) printing_to_supplying(stub *shim.ChaincodeStub, c Choc
 //////////// 8.4.2016      4:47 p.m.
 
 //=================================================================================================================================
-//	 private_to_private
+//	 supplying_to_testing
 //=================================================================================================================================
-func (t *SimpleChaincode) private_to_private(stub *shim.ChaincodeStub, c Vehicle, caller string, caller_affiliation int, recipient_name string, recipient_affiliation int) ([]byte, error) {
+func (t *SimpleChaincode) supplying_to_testing(stub *shim.ChaincodeStub, c Chocolates, caller string, caller_affiliation int, recipient_name string, recipient_affiliation int) ([]byte, error) {
 	
-	if 		v.Status				== STATE_PRIVATE_OWNERSHIP	&&
-			v.Owner					== caller					&&
-			caller_affiliation		== PRIVATE_ENTITY			&& 
-			recipient_affiliation	== PRIVATE_ENTITY			&&
-			v.Scrapped				== false					{
+	if 		c.Status				== STATE_SUPPLYING	&&
+			c.Owner					== caller			&&
+			caller_affiliation		== SUPPLIER			&& 
+			recipient_affiliation	== DU_RHONE			&&
+			c.Delivered				== false					{
 			
-					v.Owner = recipient_name
+					c.Owner = recipient_name
+					c.Status = recipient_affiliation
+	} else {
+		
+															return nil, errors.New("Permission denied")
+	
+	}
+	
+	_, err := t.save_changes(stub, c)
+	
+															if err != nil { fmt.Printf("SUPPLYING_TO_TESTING: Error saving changes: %s", err); return nil, errors.New("Error saving changes") }
+	
+	return nil, nil
+	
+}
+
+//=================================================================================================================================
+//	 testing_to_produciton
+//=================================================================================================================================
+func (t *SimpleChaincode) testing_to_produciton(stub *shim.ChaincodeStub, c Chocolates, caller string, caller_affiliation int, recipient_name string, recipient_affiliation int) ([]byte, error) {
+	
+	if 		c.Status				== STATE_TESTING			&& 
+			c.Owner					== caller					&& 
+			caller_affiliation		== DU_RHONE					&& 
+			recipient_affiliation	== DU_RHONE					&& 
+			c.Delivered     		== false					{
+		
+					c.Owner  = recipient_name
+					c.Status = recipient_affiliation
 					
 	} else {
-		
 															return nil, errors.New("Permission denied")
-	
 	}
 	
-	_, err := t.save_changes(stub, v)
-	
-															if err != nil { fmt.Printf("PRIVATE_TO_PRIVATE: Error saving changes: %s", err); return nil, errors.New("Error saving changes") }
+	_, err := t.save_changes(stub, c)
+															if err != nil { fmt.Printf("TESTING_TO_PRODUCTION: Error saving changes: %s", err); return nil, errors.New("Error saving changes") }
 	
 	return nil, nil
 	
 }
 
 //=================================================================================================================================
-//	 private_to_lease_company
+//	 production_to_delivery
 //=================================================================================================================================
-func (t *SimpleChaincode) private_to_lease_company(stub *shim.ChaincodeStub, c Vehicle, caller string, caller_affiliation int, recipient_name string, recipient_affiliation int) ([]byte, error) {
+func (t *SimpleChaincode) production_to_delivery(stub *shim.ChaincodeStub, c Chocolates, caller string, caller_affiliation int, recipient_name string, recipient_affiliation int) ([]byte, error) {
 	
-	if 		v.Status				== STATE_PRIVATE_OWNERSHIP	&& 
-			v.Owner					== caller					&& 
-			caller_affiliation		== PRIVATE_ENTITY			&& 
-			recipient_affiliation	== LEASE_COMPANY			&& 
-			v.Scrapped     			== false					{
+	if		c.Status				== STATE_PRODUCTION		&&
+			c.Owner  				== caller				&& 
+			caller_affiliation		== DU_RHONE				&& 
+			recipient_affiliation	== SHIPPING_CO			&& 
+			c.Delivered				== false					{
 		
-					v.Owner = recipient_name
-					
-	} else {
-															return nil, errors.New("Permission denied")
-	}
-	
-	_, err := t.save_changes(stub, v)
-															if err != nil { fmt.Printf("PRIVATE_TO_LEASE_COMPANY: Error saving changes: %s", err); return nil, errors.New("Error saving changes") }
-	
-	return nil, nil
-	
-}
-
-//=================================================================================================================================
-//	 lease_company_to_private
-//=================================================================================================================================
-func (t *SimpleChaincode) lease_company_to_private(stub *shim.ChaincodeStub, c Vehicle, caller string, caller_affiliation int, recipient_name string, recipient_affiliation int) ([]byte, error) {
-	
-	if		v.Status				== STATE_PRIVATE_OWNERSHIP	&&
-			v.Owner  				== caller					&& 
-			caller_affiliation		== LEASE_COMPANY			&& 
-			recipient_affiliation	== PRIVATE_ENTITY			&& 
-			v.Scrapped				== false					{
-		
-				v.Owner = recipient_name
+				c.Owner = recipient_name
+				c.Status = recipient_affiliation
 	
 	} else {
 															return nil, errors.New("Permission denied")
 	}
 	
 	_, err := t.save_changes(stub, v)
-															if err != nil { fmt.Printf("LEASE_COMPANY_TO_PRIVATE: Error saving changes: %s", err); return nil, errors.New("Error saving changes") }
+															if err != nil { fmt.Printf("PRODUCTION_TO_DELIVERY: Error saving changes: %s", err); return nil, errors.New("Error saving changes") }
 	
 	return nil, nil
 	
 }
 
 //=================================================================================================================================
-//	 private_to_scrap_merchant
+//	 delivery_to_delivered
 //=================================================================================================================================
-func (t *SimpleChaincode) private_to_scrap_merchant(stub *shim.ChaincodeStub, c Vehicle, caller string, caller_affiliation int, recipient_name string, recipient_affiliation int) ([]byte, error) {
+func (t *SimpleChaincode) delivery_to_delivered(stub *shim.ChaincodeStub, c Chocolates, caller string, caller_affiliation int, recipient_name string, recipient_affiliation int) ([]byte, error) {
 	
-	if		v.Status				== STATE_PRIVATE_OWNERSHIP	&&
-			v.Owner					== caller					&& 
-			caller_affiliation		== PRIVATE_ENTITY			&& 
-			recipient_affiliation	== SCRAP_MERCHANT			&&
-			v.Scrapped				== false					{
+	if		c.Status				== STATE_DELIVERY		&&
+			c.Owner					== caller				&& 
+			caller_affiliation		== SHIPPING_CO			&& 
+			recipient_affiliation	== IBM					&&
+			c.Delivered				== false					{
 			
-					v.Owner = recipient_name
-					v.Status = STATE_BEING_SCRAPPED
+					c.Owner = recipient_name
+					c.Status = STATE_DELIVERED
 	
 	} else {
 		
@@ -618,9 +620,9 @@ func (t *SimpleChaincode) private_to_scrap_merchant(stub *shim.ChaincodeStub, c 
 	
 	}
 	
-	_, err := t.save_changes(stub, v)
+	_, err := t.save_changes(stub, c)
 	
-															if err != nil { fmt.Printf("PRIVATE_TO_SCRAP_MERCHANT: Error saving changes: %s", err); return nil, errors.New("Error saving changes") }
+															if err != nil { fmt.Printf("DELIVERY_TO_DELIVERED: Error saving changes: %s", err); return nil, errors.New("Error saving changes") }
 	
 	return nil, nil
 	
@@ -631,7 +633,7 @@ func (t *SimpleChaincode) private_to_scrap_merchant(stub *shim.ChaincodeStub, c 
 //=================================================================================================================================
 //	 update_vin
 //=================================================================================================================================
-func (t *SimpleChaincode) update_vin(stub *shim.ChaincodeStub, c Vehicle, caller string, caller_affiliation int, new_value string) ([]byte, error) {
+func (t *SimpleChaincode) update_vin(stub *shim.ChaincodeStub, c Chocolates, caller string, caller_affiliation int, new_value string) ([]byte, error) {
 	
 	new_vin, err := strconv.Atoi(string(new_value)) 		                // will return an error if the new vin contains non numerical chars
 	
@@ -662,7 +664,7 @@ func (t *SimpleChaincode) update_vin(stub *shim.ChaincodeStub, c Vehicle, caller
 //=================================================================================================================================
 //	 update_registration
 //=================================================================================================================================
-func (t *SimpleChaincode) update_registration(stub *shim.ChaincodeStub, c Vehicle, caller string, caller_affiliation int, new_value string) ([]byte, error) {
+func (t *SimpleChaincode) update_registration(stub *shim.ChaincodeStub, c Chocolates, caller string, caller_affiliation int, new_value string) ([]byte, error) {
 
 	
 	if		v.Owner				== caller			&& 
@@ -686,7 +688,7 @@ func (t *SimpleChaincode) update_registration(stub *shim.ChaincodeStub, c Vehicl
 //=================================================================================================================================
 //	 update_colour
 //=================================================================================================================================
-func (t *SimpleChaincode) update_colour(stub *shim.ChaincodeStub, c Vehicle, caller string, caller_affiliation int, new_value string) ([]byte, error) {
+func (t *SimpleChaincode) update_colour(stub *shim.ChaincodeStub, c Chocolates, caller string, caller_affiliation int, new_value string) ([]byte, error) {
 	
 	if 		v.Owner				== caller				&&
 			caller_affiliation	== MANUFACTURER			&&/*((v.Owner				== caller			&&
@@ -711,7 +713,7 @@ func (t *SimpleChaincode) update_colour(stub *shim.ChaincodeStub, c Vehicle, cal
 //=================================================================================================================================
 //	 update_make
 //=================================================================================================================================
-func (t *SimpleChaincode) update_make(stub *shim.ChaincodeStub, c Vehicle, caller string, caller_affiliation int, new_value string) ([]byte, error) {
+func (t *SimpleChaincode) update_make(stub *shim.ChaincodeStub, c Chocolates, caller string, caller_affiliation int, new_value string) ([]byte, error) {
 	
 	if 		v.Status			== STATE_MANUFACTURE	&&
 			v.Owner				== caller				&& 
@@ -736,7 +738,7 @@ func (t *SimpleChaincode) update_make(stub *shim.ChaincodeStub, c Vehicle, calle
 //=================================================================================================================================
 //	 update_model
 //=================================================================================================================================
-func (t *SimpleChaincode) update_model(stub *shim.ChaincodeStub, c Vehicle, caller string, caller_affiliation int, new_value string) ([]byte, error) {
+func (t *SimpleChaincode) update_model(stub *shim.ChaincodeStub, c Chocolates, caller string, caller_affiliation int, new_value string) ([]byte, error) {
 	
 	if 		v.Status			== STATE_MANUFACTURE	&&
 			v.Owner				== caller				&& 
@@ -758,9 +760,9 @@ func (t *SimpleChaincode) update_model(stub *shim.ChaincodeStub, c Vehicle, call
 }
 
 //=================================================================================================================================
-//	 scrap_vehicle
+//	 scrap_Chocolates
 //=================================================================================================================================
-func (t *SimpleChaincode) scrap_vehicle(stub *shim.ChaincodeStub, c Vehicle, caller string, caller_affiliation int) ([]byte, error) {
+func (t *SimpleChaincode) scrap_Chocolates(stub *shim.ChaincodeStub, c Chocolates, caller string, caller_affiliation int) ([]byte, error) {
 
 	if		v.Status			== STATE_BEING_SCRAPPED	&& 
 			v.Owner				== caller				&& 
@@ -775,7 +777,7 @@ func (t *SimpleChaincode) scrap_vehicle(stub *shim.ChaincodeStub, c Vehicle, cal
 	
 	_, err := t.save_changes(stub, v)
 	
-															if err != nil { fmt.Printf("SCRAP_VEHICLE: Error saving changes: %s", err); return nil, errors.New("SCRAP_VEHICLError saving changes") }
+															if err != nil { fmt.Printf("SCRAP_Chocolates: Error saving changes: %s", err); return nil, errors.New("SCRAP_Chocolatesrror saving changes") }
 	
 	return nil, nil
 	
@@ -784,13 +786,13 @@ func (t *SimpleChaincode) scrap_vehicle(stub *shim.ChaincodeStub, c Vehicle, cal
 //=================================================================================================================================
 //	 Read Functions
 //=================================================================================================================================
-//	 get_vehicle_details
+//	 get_Chocolates_details
 //=================================================================================================================================
-func (t *SimpleChaincode) get_vehicle_details(stub *shim.ChaincodeStub, c Vehicle, caller string, caller_affiliation int) ([]byte, error) {
+func (t *SimpleChaincode) get_Chocolates_details(stub *shim.ChaincodeStub, c Chocolates, caller string, caller_affiliation int) ([]byte, error) {
 	
 	bytes, err := json.Marshal(v)
 	
-																if err != nil { return nil, errors.New("GET_VEHICLE_DETAILS: Invalid vehicle object") }
+																if err != nil { return nil, errors.New("GET_Chocolates_DETAILS: Invalid Chocolates object") }
 																
 	if 		v.Owner				== caller		||
 			caller_affiliation	== AUTHORITY	{
@@ -803,10 +805,10 @@ func (t *SimpleChaincode) get_vehicle_details(stub *shim.ChaincodeStub, c Vehicl
 }
 
 //=================================================================================================================================
-//	 get_vehicle_details
+//	 get_Chocolates_details
 //=================================================================================================================================
 
-func (t *SimpleChaincode) get_vehicles(stub *shim.ChaincodeStub, caller string, caller_affiliation int) ([]byte, error) {
+func (t *SimpleChaincode) get_Chocolatess(stub *shim.ChaincodeStub, caller string, caller_affiliation int) ([]byte, error) {
 
 	bytes, err := stub.GetState("v5cIDs")
 		
@@ -821,7 +823,7 @@ func (t *SimpleChaincode) get_vehicles(stub *shim.ChaincodeStub, caller string, 
 	result := "["
 	
 	var temp []byte
-	var c Vehicle
+	var c Chocolates
 	
 	for _, v5c := range v5cIDs.V5Cs {
 		
@@ -829,7 +831,7 @@ func (t *SimpleChaincode) get_vehicles(stub *shim.ChaincodeStub, caller string, 
 		
 		if err != nil {return nil, errors.New("Failed to retrieve V5C")}
 		
-		temp, err = t.get_vehicle_details(stub, c, caller, caller_affiliation)
+		temp, err = t.get_Chocolates_details(stub, c, caller, caller_affiliation)
 		
 		if err == nil {
 			result += string(temp) + ","	
